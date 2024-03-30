@@ -1,0 +1,225 @@
+
+
+import pandas as pd
+import numpy as np
+df1=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA Daily util.xlsx")
+df2=pd.read_excel(r"C:\Users\kumagoun\Downloads\Daily util EU.xlsx")
+df3=pd.read_excel(r"C:\Users\kumagoun\Downloads\Daily util NA.xlsx")
+df4=pd.read_excel(r"C:\Users\kumagoun\Downloads\Delphi WA DW1.xlsx")
+
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx") as writer:  
+    df1.to_excel(writer, sheet_name='Work_Allocation',index=False)
+    df2.to_excel(writer, sheet_name='EU',index=False)
+    df3.to_excel(writer, sheet_name='NA',index=False)
+    df4.to_excel(writer, sheet_name='EU',startrow=writer.sheets['EU'].max_row, index = False,header= False)
+WA=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='Work_Allocation')
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx", engine='openpyxl',mode='a') as writer:
+    raw=pd.DataFrame()
+    raw.to_excel(writer,sheet_name='RAW',index=False)
+raw=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW')
+RAW=pd.DataFrame(columns=['id'])
+
+if len(RAW['id'])!=len(WA['id']):
+    RAW['id']=['']*len(WA['id'])
+print(len(WA['id']))
+print(len(RAW.index))
+RAW['id']=np.where(WA['id'].notnull(),WA['id'],'')
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx", mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+    RAW['id'].to_excel(writer,sheet_name='RAW',index=False)
+RAW['id']
+df_merge=pd.merge(RAW,WA[['id','login_id']],on='id',how='left')
+df_merge=df_merge.rename(columns={'login_id':'auditor_login'})
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx", mode='a', engine='openpyxl',if_sheet_exists='replace') as writer:
+    df_merge.to_excel(writer,sheet_name='RAW',startcol=0,index=False)
+xls=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx")
+raw_df=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",'RAW')
+WA_df=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",'Work_Allocation')
+merged_df=pd.merge(raw_df,WA_df[['login_id','type']],left_on='auditor_login',right_on='login_id',how='left')
+merged_df.loc[merged_df['auditor_login'].notnull(),'Tenurity']=merged_df['type']
+merged_df=merged_df.drop(['login_id','type'],axis=1)
+merged_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+merged1_df=pd.merge(raw_df,WA_df[['login_id','type','employeename']],left_on='auditor_login',right_on='login_id',how='left')
+merged1_df=merged1_df.drop_duplicates()
+merged1_df.loc[merged1_df['auditor_login'].notnull(),'employee_name']=merged1_df['employeename']
+merged1_df=merged1_df.drop(['login_id','employeename'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+merged1_df['task']=""
+for i, row in merged1_df.iterrows():
+    id_val=row['id']
+    task_val=WA_df.loc[WA_df['id']==id_val, 'task1'].values
+    if len(task_val)>0:
+        merged1_df.at[i, 'task']=task_val[0]
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df['task_value']=''
+merged1_df.loc[~merged1_df['task'].isin(['WO', 'PL', 'ASL', 'OPTIONAL_OFF']), 'task_value'] = merged1_df['task'].apply(lambda x: 1 if x[-2:] != 'HL' else '0.5')
+merged1_df=merged1_df.drop_duplicates(subset='id',keep='first')
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["shift_code"]=""
+for index,row in merged1_df.iterrows():
+    id_value=row["id"]
+match=WA_df[WA_df["id"]==id_value]
+if not match.empty:
+    raw_df.at[index, "shift_code"]=match.iloc[0]["shift_code"]
+else:
+    raw_df.at[index, "shift_code"]=""
+merged1_df['shift_code']=merged1_df['id'].apply(lambda x: WA_df.loc[WA_df['id']==x, 'shift_code'].iloc[0] if len(WA_df.loc[WA_df['id']==x, 'shift_code'])>0 else '')
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+raw_df['work_date']=''
+merged1_df=pd.merge(merged1_df,WA_df[['id','shift_date']], on='id', how='left')
+merged1_df['work_date']=merged1_df['shift_date'].fillna('')
+merged1_df=merged1_df.drop(['shift_date'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx", mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+    df1.to_excel(writer, sheet_name='Work_Allocation',index=False)  
+    df2.to_excel(writer, sheet_name='EU',index=False)
+    df3.to_excel(writer, sheet_name='NA',index=False)
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx", mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
+     df4.to_excel(writer, sheet_name='EU',startrow=writer.sheets['EU'].max_row, index = False,header= False)
+EU_df=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",'EU')
+NA_df=pd.read_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",'NA')
+merged1_df["timespent_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "timespent"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["timespent_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "timespent"].sum() if x in NA_df["id"].tolist() else 0)
+
+merged1_df["timespent"]=merged1_df.apply(lambda row: 0 if row["timespent_EU"]==0 and row["timespent_NA"]==0 else row["timespent_EU"]+row["timespent_NA"], axis=1)
+merged1_df=merged1_df.drop(['timespent_EU','timespent_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["geofence_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "geofence_time"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["geofence_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "geofence_time"].sum() if x in NA_df["id"].tolist() else 0)
+merged1_df["geofence_time"]=merged1_df.apply(lambda row: 0 if row["geofence_EU"]==0 and row["geofence_NA"]==0 else row["geofence_EU"]+row["geofence_NA"], axis=1)
+merged1_df=merged1_df.drop(['geofence_EU','geofence_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["redp_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "redp_time"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["redp_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "redp_time"].sum() if x in NA_df["id"].tolist() else 0)
+merged1_df["redp_time"]=merged1_df.apply(lambda row: 0 if row["redp_EU"]==0 and row["redp_NA"]==0 else row["redp_EU"]+row["redp_NA"], axis=1)
+merged1_df=merged1_df.drop(['redp_EU','redp_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["pva_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "pva_time"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["pva_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "pva_time"].sum() if x in NA_df["id"].tolist() else 0)
+merged1_df["pva_time"]=merged1_df.apply(lambda row: 0 if row["pva_EU"]==0 and row["pva_NA"]==0 else row["pva_EU"]+row["pva_NA"], axis=1)
+merged1_df=merged1_df.drop(['pva_EU','pva_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["combine_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "combine_adhoc_time"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["combine_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "combine_adhoc_time"].sum() if x in NA_df["id"].tolist() else 0)
+merged1_df["combine_adhoc_time"]=merged1_df.apply(lambda row: 0 if row["combine_EU"]==0 and row["combine_NA"]==0 else row["combine_EU"]+row["combine_NA"], axis=1)
+merged1_df=merged1_df.drop(['combine_EU','combine_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+merged1_df["pva_pro_time_EU"]=merged1_df["id"].apply(lambda x: EU_df.loc[EU_df["id"]==x, "pva_pro_time"].sum() if x in EU_df["id"].tolist() else 0)
+merged1_df["pva_pro_time_NA"]=merged1_df["id"].apply(lambda x: NA_df.loc[NA_df["id"]==x, "pva_pro_time"].sum() if x in NA_df["id"].tolist() else 0)
+merged1_df["pva_pro_time"]=merged1_df.apply(lambda row: 0 if row["pva_pro_time_EU"]==0 and row["pva_pro_time_NA"]==0 else row["pva_pro_time_EU"]+row["pva_pro_time_NA"], axis=1)
+merged1_df=merged1_df.drop(['pva_pro_time_EU','pva_pro_time_NA'],axis=1)
+merged1_df.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+filt=merged1_df['work_date']=='2024-01-12 00:00:00'
+df5=merged1_df.loc[filt]
+
+df5.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+df5.sort_values(by=['timespent'],ascending=False).to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+df5
+df5.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+filt1=(df5['timespent']<360.0) & (df5['task_value']==1.0)|(df5['timespent']<180.0) & (df5['task_value']==0.5)
+df5.filtered=df5[filt1]
+df5.filtered
+df5.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+
+sum_of_columns = df5[['geofence_time','pva_time','redp_time','combine_adhoc_time','pva_pro_time']].sum()
+sum_of_columns
+
+HC_usecase = df5[['geofence_time','pva_time','redp_time','combine_adhoc_time']].sum()/480
+HC_usecase
+hc_geo=int(df5['geofence_time'].sum()/480)
+hc_pva=int(df5['pva_time'].sum()/480)
+hc_redp=int(df5['redp_time'].sum()/480)
+hc_live=int(df5['combine_adhoc_time'].sum()/480)
+
+
+n=round(df5['geofence_time'].sum()/480)
+o=round(df5['pva_time'].sum()/480)
+p=round(df5['redp_time'].sum()/480)
+r=round(df5['combine_adhoc_time'].sum()/480)
+
+df_sorted=df5.sort_values(['geofence_time', 'pva_time', 'redp_time', 'combine_adhoc_time','timespent'], ascending=[False, False, False, False,False])
+df_sorted
+df_copy=df5.copy()
+hc_dict={'geofence': hc_geo, 'pva':hc_pva, 'redp': hc_redp, 'combine_adhoc': hc_live }
+for task_type in ['geofence', 'pva', 'redp','combine_adhoc']:
+    task_df=df_copy[df_copy['task']==task_type]
+    task_df=task_df.sort_values(by=[f"{task_type.lower()}_time"], ascending=False)
+    hc=hc_dict[task_type]
+    task_df['auditor_login']=['{}{}'.format(task_type, i+1) if i < hc else 'None' for i in range(len(task_df))]
+    df_copy.update(task_df)
+print(df_copy[['auditor_login','employee_name','type','task','task_value','shift_code','work_date','timespent','geofence_time','pva_time','redp_time','combine_adhoc_time',]])
+df_copy.loc[df_copy['geofence_time'].sort_values(ascending=False).index[:n],'task']='GEOFENCE'
+df_copy.loc[df_copy['pva_time'].sort_values(ascending=False).index[:o],'task']='PVA'
+df_copy.loc[df_copy['redp_time'].sort_values(ascending=False).index[:p],'task']='RE_DP'
+df_copy.loc[df_copy['combine_adhoc_time'].sort_values(ascending=False).index[:r],'task']='LIVE'
+
+
+spoc=df5[df5['type']=='spoc']
+spoc
+sorted_spoc_df=spoc.sort_values(by='timespent',ascending=False)
+sorted_spoc_df
+spoc_pro=(spoc['timespent'].sum())
+spoc_pro
+
+s=(spoc_pro/480).astype(int)
+s
+
+sorted_spoc_df.loc[sorted_spoc_df['timespent'].sort_values(ascending=False).index[:s],'task']='PVA_PROACTIVE'
+sorted_spoc_df
+df_copy.update(sorted_spoc_df)
+
+df_copy.loc[(df_copy['auditor_login'].isin(['sudadran','suhaskon','venkych','lsvenkt','omkarvm','gvenkatn','kvardani','smamaths','survikri','ajeeruba','alvinuj','apnishal','asiddikq','atulprat','avineshh','bhavanpl','chayark','dhanielj','dneelu',
+    'drakshet','gujjulav','hnsachin','jaymukhe','manichk','mchetty','mesul','moulesh','raghhnr','rukku',
+    'soorajo','srvshrey','takkoliy','veerkamb','vishvamv'])) & (df_copy['task']=='PVA_L2'),'task'] = 'PVA_PROACTIVE_L2'
+
+
+df_copy.loc[(df_copy['auditor_login'].isin(['sudadran','suhaskon','venkych','lsvenkt','omkarvm','gvenkatn','kvardani','smamaths','survikri','ajeeruba','alvinuj','apnishal','asiddikq','atulprat','avineshh','bhavanpl','chayark','dhanielj','dneelu',
+    'drakshet','gujjulav','hnsachin','jaymukhe','manichk','mchetty','mesul','moulesh','raghhnr','rukku',
+    'soorajo','srvshrey','takkoliy','veerkamb','vishvamv'])) & (df_copy['task']=='PVA_L2')&(df_copy['task_value']==0.5),'task'] = 'PVA_PROACTIVE_L2_HL'
+df_copy.loc[(df_copy['auditor_login'].isin(['sudadran','suhaskon','venkych','lsvenkt','omkarvm','gvenkatn','kvardani','smamaths','survikri','ajeeruba','alvinuj','apnishal','asiddikq','atulprat','avineshh','bhavanpl','chayark','dhanielj','dneelu',
+    'drakshet','gujjulav','hnsachin','jaymukhe','manichk','mchetty','mesul','moulesh','raghhnr','rukku',
+    'soorajo','srvshrey','takkoliy','veerkamb','vishvamv'])) & (df_copy['task']=='PVA'), 'task'] = 'PVA_L2'
+df_copy.loc[(df_copy['auditor_login'].isin(['sudadran','suhaskon','venkych','lsvenkt','omkarvm','gvenkatn','kvardani','smamaths','survikri','ajeeruba','alvinuj','apnishal','asiddikq','atulprat','avineshh','bhavanpl','chayark','dhanielj','dneelu',
+    'drakshet','gujjulav','hnsachin','jaymukhe','manichk','mchetty','mesul','moulesh','raghhnr','rukku',
+    'soorajo','srvshrey','takkoliy','veerkamb','vishvamv'])) & (df_copy['task']=='PVA')&(df_copy['task_value']==0.5), 'task'] = 'PVA_L2_HL'
+
+
+with pd.ExcelWriter(r"C:\Users\kumagoun\Downloads\WA validation.xlsx") as writer:
+   df_copy.to_excel(writer,sheet_name='RAW',index=False)
+df_copy
+df_copy['work_date']=pd.to_datetime(df_copy['work_date'])
+df_copy['work_date']=df_copy['work_date'].dt.strftime('%d-%b-%y')
+
+df_copy
+new_df1=df_copy[['work_date','shift_code','employee_name','auditor_login','task',]]
+new_df1
+new_df1.rename(columns = {'work_date':'ShiftDate','shift_code':'ShiftCode','employee_name':'AuditorName','auditor_login':'LoginId','task':'Task'}, inplace = True)
+new_df1
+new_df1['AuditorName']=new_df1['AuditorName'].astype(str)
+new_df1['AuditorName']=new_df1['AuditorName'].str.slice(2,-2)
+new_df1
+new_df1.insert(loc=1,column='Team',value=['OUTLIERS']*len(new_df1['ShiftDate']))
+new_df1.insert(loc=6,column='Status',value='')
+new_df1.insert(loc=7,column='EmployeeId',value='')
+new_df1
+employee=pd.read_excel(r"C:\Users\kumagoun\Downloads\Employee IDs - Outliers.xlsx")
+merged_data=pd.merge(new_df1,employee,how='left',left_on='LoginId',right_on='employee_login')
+merged_data
+
+merged_data['employee_emplid']=merged_data['employee_emplid'].fillna(0)
+merged_data['employee_emplid']=merged_data['employee_emplid'].astype(int)
+merged_data['EmployeeId'] = merged_data['employee_emplid']
+merged_data_new=merged_data[['ShiftDate','Team','ShiftCode','AuditorName','LoginId','Task','Status','EmployeeId']]
+merged_data_new
+merged_data_new.to_excel(r"C:\Users\kumagoun\Downloads\WA validation.xlsx",sheet_name='RAW',index=False)
+merged_data_new.to_csv(r"C:\Users\kumagoun\Downloads\WA validation.txt", sep='\t',index=False)
